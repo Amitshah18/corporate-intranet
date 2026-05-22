@@ -1,3 +1,4 @@
+import random
 from flask import Blueprint, request, jsonify
 from config import supabase
 
@@ -41,6 +42,18 @@ def send_recognition():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@features_bp.route('/leaderboard', methods=['GET'])
+def get_leaderboard():
+    try:
+        response = supabase.table('profiles') \
+            .select('id, full_name, role, department_id, points') \
+            .order('points', desc=True) \
+            .limit(10) \
+            .execute()
+        return jsonify(response.data), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @features_bp.route('/knowledge', methods=['GET'])
 def get_knowledge():
     try:
@@ -58,20 +71,17 @@ def get_events():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- NEW: Create Event Endpoint ---
 @features_bp.route('/events', methods=['POST'])
 def create_event():
     try:
         data = request.json
-        
-        # Auto-assign colors based on event type for a polished UI
         event_type = data.get('type', 'Meeting')
         colors = {
-            'Meeting': '#3B7DD8',       # Blue
-            'Town Hall': '#7C3AED',     # Purple
-            'Workshop': '#059669',      # Emerald
-            'Social': '#EC4899',        # Pink
-            'Deadline': '#EF4444'       # Red
+            'Meeting': '#3B7DD8',
+            'Town Hall': '#7C3AED',
+            'Workshop': '#059669',
+            'Social': '#EC4899',
+            'Deadline': '#EF4444'
         }
         
         assigned_color = colors.get(event_type, '#3B7DD8')
@@ -92,7 +102,33 @@ def create_event():
 @features_bp.route('/gallery', methods=['GET'])
 def get_gallery():
     try:
-        albums = supabase.table('gallery_albums').select('*').execute()
+        albums = supabase.table('gallery_albums').select('*').order('id', desc=True).execute()
         return jsonify(albums.data), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- THE MISSING ROUTE FOR GALLERY UPLOADS ---
+@features_bp.route('/gallery', methods=['POST'])
+def create_gallery_album():
+    try:
+        data = request.json
+        gradients = [
+            'from-blue-600 to-indigo-500', 
+            'from-pink-500 to-rose-500', 
+            'from-emerald-500 to-teal-500', 
+            'from-amber-500 to-orange-500', 
+            'from-purple-600 to-pink-500'
+        ]
+        
+        new_album = {
+            "title": data.get('title'),
+            "emoji": data.get('emoji', '📸'),
+            "department": data.get('department', 'All'),
+            "color": random.choice(gradients),
+            "photo_count": int(data.get('photo_count', 0))
+        }
+        
+        response = supabase.table('gallery_albums').insert(new_album).execute()
+        return jsonify(response.data), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
