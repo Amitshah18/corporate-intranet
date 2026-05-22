@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {
+  /* Minimalist SaaS Variables */
+  --color-surface: #ffffff;
+  --color-surface-muted: #fbfbfb;
+  --color-border: #eef2f6;
+  --color-primary: #000000;
+}
