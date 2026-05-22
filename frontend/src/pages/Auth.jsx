@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { api } from '../services/api';
-import { Loader2, Mail, Lock, User, AlertCircle, Building, Command } from 'lucide-react';
+import { Loader2, Mail, Lock, User, AlertCircle, Activity, ShieldCheck } from 'lucide-react';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -46,100 +46,96 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex font-sans">
-      {/* Left Panel - Branding (Hidden on mobile) */}
-      <div className="hidden lg:flex w-1/2 bg-black text-white p-12 flex-col justify-between relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-          </svg>
-        </div>
-        
-        <div className="relative z-10 flex items-center gap-2">
-          <Command size={24} />
-          <span className="text-xl font-semibold tracking-tight">Nexus OS</span>
+    <div className="min-h-screen bg-slate-950 flex font-sans text-slate-50 relative overflow-hidden">
+      {/* Background effect */}
+      <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-gradient-to-br from-indigo-600/20 to-purple-600/20 rounded-full blur-[150px] pointer-events-none" />
+
+      {/* Left Panel */}
+      <div className="hidden lg:flex w-1/2 p-16 flex-col justify-between relative z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 flex items-center justify-center">
+            <Activity size={24} className="text-white" />
+          </div>
+          <span className="text-2xl font-bold tracking-tight text-white">Pulse</span>
         </div>
 
-        <div className="relative z-10 max-w-md">
-          <h2 className="text-4xl font-bold mb-6 leading-tight">Break silos.<br/>Build culture.</h2>
-          <p className="text-gray-400 text-lg">
-            The unified intranet platform designed for modern, high-velocity teams. Connect your entire organization in one place.
+        <div className="max-w-lg">
+          <h2 className="text-5xl font-extrabold mb-6 leading-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
+            Connect. <br/>Collaborate. <br/>Cultivate.
+          </h2>
+          <p className="text-slate-400 text-xl leading-relaxed">
+            The next-generation intranet designed to break silos and foster an engaged, high-velocity corporate culture.
           </p>
         </div>
 
-        <div className="relative z-10 flex items-center gap-4 text-sm text-gray-400">
-          <Building size={16} />
-          <span>Enterprise Grade Security</span>
+        <div className="flex items-center gap-3 text-sm text-slate-400 font-medium">
+          <ShieldCheck size={18} className="text-indigo-400" />
+          <span>SSO & Enterprise Grade Security</span>
         </div>
       </div>
 
       {/* Right Panel - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-surface-muted">
-        <div className="w-full max-w-[400px] bg-surface p-8 sm:p-10 rounded-2xl border border-border shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-          <div className="mb-8 text-center lg:text-left">
-            <h1 className="text-2xl font-semibold text-primary tracking-tight mb-2">
-              {isLogin ? 'Welcome back' : 'Create an account'}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative z-10">
+        <div className="w-full max-w-[440px] bg-white/5 backdrop-blur-2xl p-10 rounded-3xl border border-white/10 shadow-2xl">
+          <div className="mb-10 text-center lg:text-left">
+            <h1 className="text-3xl font-bold text-white tracking-tight mb-3">
+              {isLogin ? 'Welcome back' : 'Join the network'}
             </h1>
-            <p className="text-gray-500 text-sm">
+            <p className="text-slate-400">
               {isLogin ? 'Enter your corporate credentials to continue.' : 'Set up your enterprise profile.'}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="flex items-start gap-2 p-3 bg-red-50 text-red-600 rounded-lg border border-red-100 text-sm">
-                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-sm backdrop-blur-md">
+                <AlertCircle size={18} className="shrink-0 mt-0.5" />
                 <span className="font-medium leading-tight">{error}</span>
               </div>
             )}
 
             {!isLogin && (
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">Full Name</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-2.5 text-gray-400" size={18} />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">Full Name</label>
+                <div className="relative group">
+                  <User className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={20} />
                   <input
                     type="text"
                     required
                     value={formData.fullName}
                     onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-                    className="w-full pl-10 pr-3 py-2.5 bg-surface-muted border border-border rounded-lg outline-none focus:border-black focus:bg-surface transition-all text-sm"
+                    className="w-full pl-12 pr-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl outline-none focus:border-indigo-500 focus:bg-slate-900/80 transition-all text-white placeholder:text-slate-600"
                     placeholder="John Doe"
                   />
                 </div>
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Work Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-2.5 text-gray-400" size={18} />
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300">Work Email</label>
+              <div className="relative group">
+                <Mail className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={20} />
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full pl-10 pr-3 py-2.5 bg-surface-muted border border-border rounded-lg outline-none focus:border-black focus:bg-surface transition-all text-sm"
+                  className="w-full pl-12 pr-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl outline-none focus:border-indigo-500 focus:bg-slate-900/80 transition-all text-white placeholder:text-slate-600"
                   placeholder="name@company.com"
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 text-gray-400" size={18} />
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300">Password</label>
+              <div className="relative group">
+                <Lock className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={20} />
                 <input
                   type="password"
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  className="w-full pl-10 pr-3 py-2.5 bg-surface-muted border border-border rounded-lg outline-none focus:border-black focus:bg-surface transition-all text-sm"
+                  className="w-full pl-12 pr-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl outline-none focus:border-indigo-500 focus:bg-slate-900/80 transition-all text-white placeholder:text-slate-600"
                   placeholder="••••••••"
                 />
               </div>
@@ -148,19 +144,16 @@ export default function Auth() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-black text-white py-2.5 rounded-lg text-sm font-medium hover:bg-gray-900 transition-all disabled:opacity-70 flex justify-center items-center mt-2 shadow-sm"
+              className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white py-3.5 rounded-xl font-bold transition-all disabled:opacity-70 flex justify-center items-center mt-4 shadow-lg shadow-indigo-500/25"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : (isLogin ? 'Sign In' : 'Sign Up')}
+              {loading ? <Loader2 size={20} className="animate-spin" /> : (isLogin ? 'Sign In' : 'Create Account')}
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-border text-center">
+          <div className="mt-8 text-center">
             <button 
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError(null);
-              }} 
-              className="text-sm text-gray-500 hover:text-black transition-colors font-medium"
+              onClick={() => { setIsLogin(!isLogin); setError(null); }} 
+              className="text-sm text-slate-400 hover:text-white transition-colors font-medium"
             >
               {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
             </button>
