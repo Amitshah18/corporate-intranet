@@ -1,5 +1,5 @@
-// Hardcoded to guarantee connection to Flask for local dev
-const API_BASE_URL = 'http://localhost:5000/api';
+// This will use the Vercel Environment Variable in production, and localhost locally.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 export const api = {
   get: async (endpoint) => {
