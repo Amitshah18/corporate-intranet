@@ -1,34 +1,8 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
 import { api } from '../services/api';
-import { Loader2 } from 'lucide-react';
+import { Avatar } from '../App';
+import { Loader2, Send } from 'lucide-react';
 
-// --- MOCK DATA FALLBACK ---
-const FALLBACK_POSTS = [
-  {
-    id: "mock1",
-    content: "🎉 We're thrilled to announce that Pulse Intranet v2.0 is officially live across all verticals! This platform is your new home for connection, visibility, and collaboration.",
-    type: "Announcement",
-    created_at: new Date(Date.now() - 3600000).toISOString(), 
-    profiles: { full_name: "Arjun Mehta", department_id: "Engineering", role: "Admin" }
-  },
-  {
-    id: "mock2",
-    content: "Q2 OKR check-in: Engineering shipped 3 major features this quarter. Massive kudos to the entire team! 🚀 We're at 92% OKR attainment across the org.",
-    type: "Update",
-    created_at: new Date(Date.now() - 86400000).toISOString(), 
-    profiles: { full_name: "Priya Sharma", department_id: "People & Culture", role: "HR" }
-  },
-  {
-    id: "mock3",
-    content: "Huge shoutout to the design team for redesigning the entire onboarding flow in record time. The new design reduced drop-off by 34% and the feedback from new joiners has been incredible. 🌟",
-    type: "Recognition",
-    created_at: new Date(Date.now() - 172800000).toISOString(), 
-    profiles: { full_name: "Rohan Kapoor", department_id: "Product", role: "Employee" }
-  }
-];
-
-// --- HELPER COMPONENTS ---
 const timeAgo = (dateStr) => {
   const diff = Math.floor((new Date() - new Date(dateStr)) / 1000);
   if (diff < 60) return "just now";
@@ -52,120 +26,61 @@ function Badge({ type }) {
   );
 }
 
-// Local Avatar component to prevent import issues
-function Avatar({ name = "User", size = 40 }) {
-  const colors = ["#3B7DD8","#7C3AED","#E11D48","#D97706","#059669","#0891B2","#EA580C","#EC4899"];
-  const char = name.charAt(0).toUpperCase();
-  const color = colors[char.charCodeAt(0) % colors.length] || colors[0];
-  
-  return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: color + "22", border: `2px solid ${color}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.35, fontWeight: 700, color, flexShrink: 0 }}>
-      {char}
-    </div>
-  );
-}
-
-export default function Feed() {
+// CRITICAL FIX: We accept currentUser directly from App.jsx so we don't have to fetch it again.
+export default function Feed({ currentUser }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState('');
   const [type, setType] = useState('Update');
   const [filter, setFilter] = useState('All');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isUsingFallback, setIsUsingFallback] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
-useEffect(() => {
-    let isMounted = true;
-    const init = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          // Default fallback data
-          let profileData = { full_name: 'User', role: 'Employee', department_id: 'Global' };
-          
-          try {
-            const { data } = await supabase.table('profiles').select('full_name, role, department_id').eq('id', user.id).single();
-            if (data) profileData = data;
-          } catch (e) {
-            console.warn("Profile fetch issue, using defaults:", e);
-          }
-
-          if (isMounted) {
-            setCurrentUser({ 
-              id: user.id, 
-              name: profileData.full_name,
-              role: profileData.role,
-              dept: profileData.department_id
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Auth fetch error:", e);
-      }
-      
-      await fetchFeed();
-    };
-    init();
-    
-    return () => { isMounted = false; };
+  useEffect(() => {
+    fetchFeed();
   }, []);
+
   const fetchFeed = async () => {
     setLoading(true);
     try {
-      // Create a timeout so it doesn't spin forever if the backend is sleeping
-      const fetchPromise = api.get('/feed');
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
-      
-      const data = await Promise.race([fetchPromise, timeoutPromise]);
-      
-      if (data && data.length > 0) {
-        setPosts(data);
-        setIsUsingFallback(false);
-      } else {
-        setPosts(FALLBACK_POSTS);
-        setIsUsingFallback(true);
-      }
+      const data = await api.get('/feed');
+      setPosts(data || []);
     } catch (error) {
-      console.warn("Backend fetch failed/timed out, injecting mock data:", error);
-      setPosts(FALLBACK_POSTS);
-      setIsUsingFallback(true);
+      console.error("Backend fetch failed:", error);
     } finally {
-      // CRITICAL: This guarantees the spinner stops no matter what happens
       setLoading(false); 
     }
   };
 
   const handlePost = async () => {
+    // If the user profile hasn't loaded yet from App.jsx, don't allow posting
     if (!content.trim() || !currentUser) return;
     setIsSubmitting(true);
+    setSuccessMsg('');
     
     try {
-      // Optimistic UI update (feels instant to the user)
-      const optimisticPost = {
-        id: `temp-${Date.now()}`,
-        content,
+      // Send real data to the Flask backend
+      await api.post('/feed', { 
+        author_id: currentUser.id, 
+        content, 
         type,
-        created_at: new Date().toISOString(),
-        profiles: { 
-          full_name: currentUser.name, 
-          department_id: currentUser.dept, 
-          role: currentUser.role 
-        }
-      };
+        role: currentUser.role // Flask uses this to determine if it goes to moderation
+      });
       
-      setPosts(current => [optimisticPost, ...current]);
       setContent('');
 
-      // Attempt to send to backend if we are connected
-      if (!isUsingFallback) {
-        await api.post('/feed', { author_id: currentUser.id, content, type, role: currentUser.role });
-        setTimeout(async () => {
-          await fetchFeed(); 
-        }, 500); // Refresh to get the real DB ID
+      // UX FIX: If they are an Employee, tell them it went to moderation!
+      if (currentUser.role === 'Employee') {
+        setSuccessMsg('Post submitted to Command Center for review.');
+        setTimeout(() => setSuccessMsg(''), 5000);
+      } else {
+        // If Admin/HR, it bypassed moderation, so refresh the feed instantly
+        await fetchFeed(); 
       }
+
     } catch (error) {
       console.error("Failed to post:", error);
+      alert("Failed to submit post. Ensure backend is running.");
     } finally {
       setIsSubmitting(false);
     }
@@ -183,17 +98,11 @@ useEffect(() => {
   return (
     <div className="max-w-2xl mx-auto font-sans">
       
-      {isUsingFallback && (
-        <div className="mb-6 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-xs font-semibold flex items-center justify-center text-center">
-          ⚠️ Disconnected from Backend Server. Displaying mock data for UI testing.
-        </div>
-      )}
-
       {/* Composer Module */}
       <div className="bg-[#0f172a] border border-indigo-500/30 rounded-[18px] p-5 mb-8 relative overflow-hidden shadow-2xl shadow-indigo-500/5">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
         <div className="flex gap-4 items-start">
-          <Avatar name={currentUser?.name || 'User'} size={40} />
+          <Avatar name={currentUser?.full_name || 'User'} size={40} />
           <div className="flex-1">
             <textarea 
               value={content} 
@@ -201,6 +110,13 @@ useEffect(() => {
               placeholder="Share a milestone, update, or recognize a peer..." 
               className="w-full bg-transparent border-none outline-none resize-none text-slate-200 text-[15px] min-h-[70px] placeholder:text-slate-600"
             />
+            
+            {successMsg && (
+              <div className="text-emerald-400 text-xs font-bold bg-emerald-400/10 px-3 py-2 rounded-lg border border-emerald-400/20 mb-2">
+                ✅ {successMsg}
+              </div>
+            )}
+
             <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-2">
               <select 
                 value={type} 
@@ -214,9 +130,9 @@ useEffect(() => {
               <button 
                 onClick={handlePost} 
                 disabled={isSubmitting || !content.trim()} 
-                className="bg-gradient-to-br from-indigo-500 to-purple-600 disabled:from-[#1e293b] disabled:to-[#1e293b] disabled:text-slate-500 text-white border-none rounded-lg px-6 py-2 text-[13px] font-bold cursor-pointer transition-all shadow-lg hover:shadow-indigo-500/25"
+                className="bg-gradient-to-br from-indigo-500 to-purple-600 disabled:from-[#1e293b] disabled:to-[#1e293b] disabled:text-slate-500 text-white border-none rounded-lg px-6 py-2 text-[13px] font-bold cursor-pointer transition-all shadow-lg hover:shadow-indigo-500/25 flex items-center justify-center min-w-[80px]"
               >
-                {isSubmitting ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Post'}
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <><Send size={14} className="mr-1.5"/> Post</>}
               </button>
             </div>
           </div>

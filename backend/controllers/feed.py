@@ -6,9 +6,9 @@ feed_bp = Blueprint('feed', __name__)
 @feed_bp.route('/feed', methods=['GET'])
 def get_feed():
     try:
-        # Relational fetch: Posts + Author details (Role & Dept for multi-tenancy)
+        # Relational join: posts -> profiles -> departments
         response = supabase.table('posts') \
-            .select('id, content, type, created_at, profiles(role, department_id)') \
+            .select('id, content, type, created_at, profiles(full_name, role, departments(name))') \
             .eq('is_approved', True) \
             .order('created_at', desc=True) \
             .execute()
@@ -20,10 +20,16 @@ def get_feed():
 def create_post():
     try:
         data = request.json
-        # Enforce moderation flag based on role before insert
-        data['is_approved'] = True if data.get('role') in ['Admin', 'HR'] else False 
+        user_role = data.get('role', 'Employee')
         
-        response = supabase.table('posts').insert(data).execute()
+        insert_payload = {
+            "author_id": data.get('author_id'),
+            "content": data.get('content'),
+            "type": data.get('type'),
+            "is_approved": True if user_role in ['Admin', 'HR'] else False
+        }
+        
+        response = supabase.table('posts').insert(insert_payload).execute()
         return jsonify(response.data), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500

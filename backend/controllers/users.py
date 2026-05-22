@@ -45,3 +45,4 @@ def get_directory():
         return jsonify(response.data), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
