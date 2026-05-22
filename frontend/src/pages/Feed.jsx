@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
+import { api } from '../services/api';
 import { MessageSquare, Award, Megaphone, Loader2 } from 'lucide-react';
 
 export default function Feed() {
@@ -14,13 +15,10 @@ export default function Feed() {
 
   const fetchFeed = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/feed');
-      if (response.ok) {
-        const data = await response.json();
-        setPosts(data);
-      }
+      const data = await api.get('/feed');
+      setPosts(data);
     } catch (error) {
-      console.error('Feed fetch error:', error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -32,22 +30,16 @@ export default function Feed() {
 
     const { data: { user } } = await supabase.auth.getUser();
     
-    const payload = {
-      author_id: user.id,
-      content: newPostContent,
-      type: postType
-    };
-
     try {
-      await fetch('http://localhost:5000/api/feed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      await api.post('/feed', {
+        author_id: user.id,
+        content: newPostContent,
+        type: postType
       });
       setNewPostContent('');
-      fetchFeed(); // Refresh feed
+      fetchFeed();
     } catch (error) {
-      console.error('Post creation error:', error);
+      console.error(error);
     }
   };
 

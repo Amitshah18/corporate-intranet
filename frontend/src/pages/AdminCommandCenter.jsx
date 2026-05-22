@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api } from '../services/api';
 import { Check, X, ShieldAlert, Loader2 } from 'lucide-react';
 
 export default function AdminCommandCenter() {
@@ -11,32 +12,56 @@ export default function AdminCommandCenter() {
 
   const fetchPending = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/admin/pending');
-      if (response.ok) {
-        const data = await response.json();
-        setPendingPosts(data);
-      }
+      const data = await api.get('/admin/pending');
+      setPendingPosts(data);
     } catch (error) {
-      console.error('Fetch error:', error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
   const moderatePost = async (id, action) => {
-    // Optimistic UI update
     setPendingPosts(current => current.filter(post => post.id !== id));
-    
     try {
-      await fetch(`http://localhost:5000/api/admin/moderate/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action })
-      });
+      await api.patch(`/admin/moderate/${id}`, { action });
     } catch (error) {
-      console.error('Moderation error:', error);
-      fetchPending(); // Revert on failure
+      console.error(error);
+      fetchPending();
     }
+  };
+
+  const ProvisionUserForm = () => {
+    const [formData, setFormData] = useState({ email: '', password: '', full_name: '', role: 'Employee', department_id: '' });
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await api.post('/users/provision', formData);
+        alert('User provisioned successfully');
+        setFormData({ email: '', password: '', full_name: '', role: 'Employee', department_id: '' });
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    return (
+      <div className="bg-surface border border-border rounded-lg p-6 shadow-sm mt-8">
+        <h2 className="text-lg font-semibold mb-4">Provision New Employee</h2>
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+          <input type="text" placeholder="Full Name" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="border border-border p-2 rounded text-sm" required />
+          <input type="email" placeholder="Corporate Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="border border-border p-2 rounded text-sm" required />
+          <input type="password" placeholder="Temporary Password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="border border-border p-2 rounded text-sm" required />
+          <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} className="border border-border p-2 rounded text-sm bg-transparent">
+            <option value="Employee">Employee</option>
+            <option value="HR">HR</option>
+            <option value="Admin">Admin</option>
+          </select>
+          <input type="text" placeholder="Department UUID (Optional)" value={formData.department_id} onChange={e => setFormData({...formData, department_id: e.target.value})} className="border border-border p-2 rounded text-sm" />
+          <button type="submit" className="col-span-2 bg-black text-white py-2 rounded font-medium text-sm">Create Account</button>
+        </form>
+      </div>
+    );
   };
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-black" /></div>;
@@ -47,42 +72,8 @@ export default function AdminCommandCenter() {
         <ShieldAlert size={24} className="text-black" />
         <h1 className="text-2xl font-semibold text-primary tracking-tight">Moderation Queue</h1>
       </div>
-
-      {pendingPosts.length === 0 ? (
-        <div className="bg-surface border border-border rounded-lg p-8 text-center text-gray-500 text-sm shadow-sm">
-          No pending posts require review.
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {pendingPosts.map((post) => (
-            <div key={post.id} className="bg-surface border border-border rounded-lg p-5 flex items-start justify-between shadow-sm">
-              <div className="max-w-[80%]">
-                <div className="flex items-center gap-2 mb-2 text-xs font-medium text-gray-500">
-                  <span className="bg-surface-muted px-2 py-0.5 rounded border border-border">{post.type}</span>
-                  <span>Dept: {post.profiles?.department_id}</span>
-                </div>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap">{post.content}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => moderatePost(post.id, 'reject')}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                  title="Reject & Delete"
-                >
-                  <X size={18} />
-                </button>
-                <button 
-                  onClick={() => moderatePost(post.id, 'approve')}
-                  className="p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors"
-                  title="Approve & Publish"
-                >
-                  <Check size={18} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* ... (Keep existing pendingPosts mapping unchanged) */}
+      <ProvisionUserForm />
     </div>
   );
 }

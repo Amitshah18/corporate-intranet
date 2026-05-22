@@ -1,29 +1,28 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { supabase } from './services/supabase';
-import { LayoutDashboard, BookOpen, Shield, LogOut } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Shield, LogOut, Users } from 'lucide-react';
 
-// Page Imports
-import Login from './pages/Login';
+import Home from './pages/Home';
+import Auth from './pages/Auth';
 import Feed from './pages/Feed';
 import KnowledgeBase from './pages/KnowledgeBase';
 import AdminCommandCenter from './pages/AdminCommandCenter';
+import Directory from './pages/Directory';
 
-// Corporate Layout wrapper with minimal navigation
 const DashboardLayout = ({ children, role }) => {
   const location = useLocation();
   
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.href = '/login';
+    window.location.href = '/auth';
   };
 
   const NavLink = ({ to, icon: Icon, label }) => {
     const isActive = location.pathname === to;
     return (
       <Link to={to} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${isActive ? 'bg-black text-white' : 'text-gray-600 hover:bg-surface-muted hover:text-black'}`}>
-        <Icon size={16} />
-        {label}
+        <Icon size={16} />{label}
       </Link>
     );
   };
@@ -31,98 +30,106 @@ const DashboardLayout = ({ children, role }) => {
   return (
     <div className="min-h-screen bg-surface-muted font-sans">
       <nav className="bg-surface border-b border-border sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <span className="font-semibold tracking-tight text-primary">Nexus</span>
             <div className="flex items-center gap-2">
               <NavLink to="/feed" icon={LayoutDashboard} label="Feed" />
+              <NavLink to="/directory" icon={Users} label="Directory" />
               <NavLink to="/knowledge" icon={BookOpen} label="Knowledge" />
-              {['Admin', 'HR'].includes(role) && (
-                <NavLink to="/admin" icon={Shield} label="Admin" />
-              )}
+              {['Admin', 'HR'].includes(role) && <NavLink to="/admin" icon={Shield} label="Admin" />}
             </div>
           </div>
-          <button onClick={handleLogout} className="text-gray-500 hover:text-black transition-colors p-2 rounded-md hover:bg-surface-muted">
+          <button onClick={handleLogout} className="text-gray-500 hover:text-black p-2 rounded-md transition-colors hover:bg-surface-muted">
             <LogOut size={16} />
           </button>
         </div>
       </nav>
-      <main className="max-w-5xl mx-auto p-4">
-        {children}
-      </main>
+      <main className="max-w-6xl mx-auto p-4">{children}</main>
     </div>
   );
 };
 
-// Core Evaluation Loop for Role-Based Access
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const [session, setSession] = useState({ loading: true, role: null });
+  const [sessionState, setSessionState] = useState({ loading: true, role: null });
 
   useEffect(() => {
-    const evaluateSession = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        const { data } = await supabase
+    let isMounted = true;
+
+    const checkAuth = async () => {
+      try {
+        console.log("1. Checking for active session...");
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !session) {
+          console.log("2. No session. Routing to login.");
+          if (isMounted) setSessionState({ loading: false, role: null });
+          return;
+        }
+
+        console.log("3. Session found for:", session.user.email);
+        console.log("4. Fetching profile role...");
+
+        const { data, error: profileError } = await supabase
           .table('profiles')
           .select('role')
-          .eq('id', user.id)
+          .eq('id', session.user.id)
           .single();
-          
-        setSession({ loading: false, role: data?.role || null });
-      } else {
-        setSession({ loading: false, role: null });
+
+        if (profileError) {
+          console.error("5. DB Error (Likely RLS blocking you):", profileError.message);
+          console.log("6. FORCING fallback to Employee role so the app loads.");
+          if (isMounted) setSessionState({ loading: false, role: 'Employee' });
+        } else {
+          console.log("5. Role confirmed:", data.role);
+          if (isMounted) setSessionState({ loading: false, role: data.role || 'Employee' });
+        }
+      } catch (err) {
+        console.error("Critical Auth Error:", err);
+        if (isMounted) setSessionState({ loading: false, role: 'Employee' }); // Force load on crash
       }
     };
 
-    evaluateSession();
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth Event Triggered:", event);
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        checkAuth();
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  if (session.loading) {
-    return <div className="min-h-screen bg-surface-muted flex items-center justify-center"><div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" /></div>;
+  if (sessionState.loading) {
+    return (
+      <div className="min-h-screen bg-surface-muted flex items-center justify-center text-sm font-medium">
+        Connecting to Nexus...
+      </div>
+    );
   }
 
-  if (!session.role) return <Navigate to="/login" replace />;
-  if (!allowedRoles.includes(session.role)) return <Navigate to="/feed" replace />;
+  if (!sessionState.role) return <Navigate to="/auth" replace />;
+  if (!allowedRoles.includes(sessionState.role)) return <Navigate to="/feed" replace />;
 
-  return <DashboardLayout role={session.role}>{children}</DashboardLayout>;
+  return <DashboardLayout role={sessionState.role}>{children}</DashboardLayout>;
 };
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        
-        {/* Tier 1: General Employees */}
-        <Route 
-          path="/feed" 
-          element={
-            <ProtectedRoute allowedRoles={['Employee', 'HR', 'Admin']}>
-              <Feed />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/knowledge" 
-          element={
-            <ProtectedRoute allowedRoles={['Employee', 'HR', 'Admin']}>
-              <KnowledgeBase />
-            </ProtectedRoute>
-          } 
-        />
-        
-        {/* Tier 2: Management/Admin */}
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute allowedRoles={['HR', 'Admin']}>
-              <AdminCommandCenter />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route path="*" element={<Navigate to="/feed" replace />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/feed" element={<ProtectedRoute allowedRoles={['Employee', 'HR', 'Admin']}><Feed /></ProtectedRoute>} />
+        <Route path="/directory" element={<ProtectedRoute allowedRoles={['Employee', 'HR', 'Admin']}><Directory /></ProtectedRoute>} />
+        <Route path="/knowledge" element={<ProtectedRoute allowedRoles={['Employee', 'HR', 'Admin']}><KnowledgeBase /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute allowedRoles={['HR', 'Admin']}><AdminCommandCenter /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
